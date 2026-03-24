@@ -1,0 +1,64 @@
+name: build-and-release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Read application version
+        id: version
+        shell: pwsh
+        run: |
+          $version = python -c "from pathlib import Path; import re; text = Path('src/bluetooth_resetter/version.py').read_text(encoding='utf-8'); match = re.search(r'__version__\s*=\s*\"([^\"]+)\"', text); print(match.group(1))"
+          if (-not $version) { throw 'No se pudo obtener la versión.' }
+          "app_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build executable
+        shell: pwsh
+        run: .\build.ps1 -Clean
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BluetoothResetter-${{ steps.version.outputs.app_version }}
+          path: |
+            BluetoothResetter.exe
+            Fix-AudioBluetooth-Admin.bat
+            scripts/Fix-AudioBluetooth.ps1
+            README.md
+            LICENSE
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.app_version }}
+          name: ${{ steps.version.outputs.app_version }}
+          generate_release_notes: true
+          files: |
+            BluetoothResetter.exe
+            Fix-AudioBluetooth-Admin.bat
+            scripts/Fix-AudioBluetooth.ps1

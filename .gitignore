@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.spec
+.venv/
+.build/
+build/
+dist/
+.vs/
+config.json
+log.txt
+BluetoothResetter.exe
