@@ -1,4 +1,4 @@
-# Bluetooth Resetter V0.0.2
+# Bluetooth Resetter V0.0.3
 
 Aplicación de escritorio y toolkit de automatización para Windows 10/11 que recupera el stack de audio y Bluetooth después de suspensión o hibernación, orientado al problema recurrente de reconexión con audífonos como `Soundcore Q45`.
 
@@ -161,12 +161,12 @@ git add .
 Agrega todos los archivos del proyecto al staging.
 
 ```powershell
-git commit -m "fix: resolve menu accelerator rendering and shortcut bindings (V0.0.2)"
+git commit -m "fix: resolve GitHub Actions version parsing in release workflow (V0.0.3)"
 ```
 Crea el primer commit con un mensaje profesional y alineado al release inicial.
 
 ```powershell
-git tag V0.0.2
+git tag V0.0.3
 ```
 Crea el tag inicial coherente con la versión visible en la app.
 
