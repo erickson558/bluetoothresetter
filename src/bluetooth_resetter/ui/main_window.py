@@ -87,20 +87,57 @@ class BluetoothResetterApp:
     def _build_menu(self) -> None:
         self.menu_bar = tk.Menu(self.root)
 
-        file_menu = tk.Menu(self.menu_bar, tearoff=False)
-        file_menu.add_command(label=f"{self.t('menu_run')}\t{self.t('menu_run_accel')}", command=self.start_fix)
-        file_menu.add_separator()
-        file_menu.add_command(label=f"{self.t('menu_exit')}\t{self.t('menu_exit_accel')}", command=self.on_exit)
-        self.menu_bar.add_cascade(label=self.t("menu_file"), menu=file_menu)
+        menu_meta = self._get_menu_metadata()
 
-        language_menu = tk.Menu(self.menu_bar, tearoff=False)
-        language_menu.add_command(label=self.t("language_es"), command=lambda: self.change_language("es"))
-        language_menu.add_command(label=self.t("language_en"), command=lambda: self.change_language("en"))
-        self.menu_bar.add_cascade(label=self.t("menu_language"), menu=language_menu)
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=False)
+        self.file_menu.add_command(
+            label=self.t("menu_run"),
+            accelerator=self.t("menu_run_accel"),
+            underline=menu_meta["items"]["run"],
+            command=self.start_fix,
+        )
+        self.file_menu.add_separator()
+        self.file_menu.add_command(
+            label=self.t("menu_exit"),
+            accelerator=self.t("menu_exit_accel"),
+            underline=menu_meta["items"]["exit"],
+            command=self.on_exit,
+        )
+        self.menu_bar.add_cascade(
+            label=self.t("menu_file"),
+            menu=self.file_menu,
+            underline=menu_meta["menus"]["file"],
+        )
 
-        help_menu = tk.Menu(self.menu_bar, tearoff=False)
-        help_menu.add_command(label=f"{self.t('menu_about')}\t{self.t('menu_about_accel')}", command=self.show_about)
-        self.menu_bar.add_cascade(label=self.t("menu_help"), menu=help_menu)
+        self.language_menu = tk.Menu(self.menu_bar, tearoff=False)
+        self.language_menu.add_command(
+            label=self.t("language_es"),
+            underline=0,
+            command=lambda: self.change_language("es"),
+        )
+        self.language_menu.add_command(
+            label=self.t("language_en"),
+            underline=0,
+            command=lambda: self.change_language("en"),
+        )
+        self.menu_bar.add_cascade(
+            label=self.t("menu_language"),
+            menu=self.language_menu,
+            underline=menu_meta["menus"]["language"],
+        )
+
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=False)
+        self.help_menu.add_command(
+            label=self.t("menu_about"),
+            accelerator=self.t("menu_about_accel"),
+            underline=menu_meta["items"]["about"],
+            command=self.show_about,
+        )
+        self.menu_bar.add_cascade(
+            label=self.t("menu_help"),
+            menu=self.help_menu,
+            underline=menu_meta["menus"]["help"],
+        )
 
         self.root.config(menu=self.menu_bar)
 
@@ -222,9 +259,11 @@ class BluetoothResetterApp:
         self.countdown_label.pack(side="right")
 
     def _bind_events(self) -> None:
-        self.root.bind("<Control-r>", lambda event: self.start_fix())
-        self.root.bind("<Control-q>", lambda event: self.on_exit())
-        self.root.bind("<F1>", lambda event: self.show_about())
+        self.root.bind_all("<Control-r>", lambda event: self.start_fix())
+        self.root.bind_all("<Control-R>", lambda event: self.start_fix())
+        self.root.bind_all("<Control-q>", lambda event: self.on_exit())
+        self.root.bind_all("<Control-Q>", lambda event: self.on_exit())
+        self.root.bind_all("<F1>", lambda event: self.show_about())
         self.root.bind("<Configure>", self._on_window_configure)
         self.auto_close_seconds_var.trace_add("write", self._on_seconds_changed)
 
@@ -248,6 +287,34 @@ class BluetoothResetterApp:
         self.device_hint_label.configure(text=self.t("device_hint"))
         self.log_title_label.configure(text=self.t("log_title"))
         self._build_menu()
+
+    def _get_menu_metadata(self) -> dict[str, dict[str, int]]:
+        if self.language == "en":
+            return {
+                "menus": {
+                    "file": 0,
+                    "language": 0,
+                    "help": 0,
+                },
+                "items": {
+                    "run": 0,
+                    "exit": 1,
+                    "about": 0,
+                },
+            }
+
+        return {
+            "menus": {
+                "file": 0,
+                "language": 0,
+                "help": 1,
+            },
+            "items": {
+                "run": 0,
+                "exit": 0,
+                "about": 0,
+            },
+        }
 
     def append_log(self, message: str, level: str = "INFO") -> None:
         if message.startswith("[") and "] [" in message:
