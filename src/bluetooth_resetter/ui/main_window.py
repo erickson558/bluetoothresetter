@@ -3,8 +3,9 @@ from __future__ import annotations
 import queue
 import threading
 import tkinter as tk
+import webbrowser
 from datetime import datetime
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from ..i18n.translations import SUPPORTED_LANGUAGES, translate
 from ..services.app_paths import get_config_path, get_icon_path, get_log_path, get_powershell_script_path
@@ -14,8 +15,13 @@ from ..services.powershell_runner import BluetoothFixRunner
 from ..version import __version__
 
 
+DONATION_URL = "https://www.paypal.com/donate/?hosted_button_id=ZABFRXC2P3JQN"
+
+
 class BluetoothResetterApp:
     def __init__(self, is_elevated: bool) -> None:
+        # Se marca al cerrar la ventana para evitar programar callbacks sobre un root destruido.
+        self.is_shutting_down = False
         self.is_elevated = is_elevated
         self.event_queue: queue.Queue[tuple[str, object]] = queue.Queue()
         self.run_in_progress = False
@@ -110,16 +116,18 @@ class BluetoothResetterApp:
         )
 
         self.language_menu = tk.Menu(self.menu_bar, tearoff=False)
-        self.language_menu.add_command(
-            label=self.t("language_es"),
-            underline=0,
-            command=lambda: self.change_language("es"),
-        )
-        self.language_menu.add_command(
-            label=self.t("language_en"),
-            underline=0,
-            command=lambda: self.change_language("en"),
-        )
+        # El menu de idiomas se construye desde SUPPORTED_LANGUAGES para escalar sin duplicar codigo.
+        language_key_map = {
+            "es": "language_es",
+            "en": "language_en",
+            "pt": "language_pt",
+        }
+        for lang in SUPPORTED_LANGUAGES:
+            self.language_menu.add_command(
+                label=self.t(language_key_map.get(lang, "language_en")),
+                underline=0,
+                command=lambda selected_language=lang: self.change_language(selected_language),
+            )
         self.menu_bar.add_cascade(
             label=self.t("menu_language"),
             menu=self.language_menu,
@@ -127,6 +135,12 @@ class BluetoothResetterApp:
         )
 
         self.help_menu = tk.Menu(self.menu_bar, tearoff=False)
+        self.help_menu.add_command(
+            label=self.t("menu_donate"),
+            underline=menu_meta["items"]["donate"],
+            command=self.open_donation,
+        )
+        self.help_menu.add_separator()
         self.help_menu.add_command(
             label=self.t("menu_about"),
             accelerator=self.t("menu_about_accel"),
@@ -177,6 +191,10 @@ class BluetoothResetterApp:
 
         self.fix_button = ttk.Button(left_actions, style="Accent.TButton", command=self.start_fix)
         self.fix_button.pack(side="left")
+
+        # Boton directo para donaciones con enlace externo.
+        self.donate_button = ttk.Button(left_actions, style="Secondary.TButton", command=self.open_donation)
+        self.donate_button.pack(side="left", padx=(10, 0))
 
         self.exit_button = ttk.Button(left_actions, style="Secondary.TButton", command=self.on_exit)
         self.exit_button.pack(side="left", padx=(10, 0))
@@ -280,12 +298,18 @@ class BluetoothResetterApp:
         self.version_badge.configure(text=self.t("version_label", version=__version__))
         self.admin_badge.configure(text=self.t("status_admin") if self.is_elevated else self.t("status_user"))
         self.fix_button.configure(text=self.t("fix_button"))
+        self.donate_button.configure(text=self.t("donate_button"))
         self.exit_button.configure(text=self.t("exit_button"))
         self.auto_run_check.configure(text=self.t("auto_run"))
         self.auto_close_check.configure(text=self.t("auto_close"))
         self.seconds_label.configure(text=self.t("auto_close_seconds"))
         self.device_hint_label.configure(text=self.t("device_hint"))
         self.log_title_label.configure(text=self.t("log_title"))
+
+        # Si hay countdown activo, se refresca de inmediato en el idioma seleccionado.
+        if self.auto_close_job and self.auto_close_remaining > 0:
+            self.countdown_var.set(self.t("status_countdown", seconds=self.auto_close_remaining))
+
         self._build_menu()
 
     def _get_menu_metadata(self) -> dict[str, dict[str, int]]:
@@ -299,6 +323,7 @@ class BluetoothResetterApp:
                 "items": {
                     "run": 0,
                     "exit": 1,
+                    "donate": 0,
                     "about": 0,
                 },
             }
@@ -312,6 +337,7 @@ class BluetoothResetterApp:
             "items": {
                 "run": 0,
                 "exit": 0,
+                "donate": 0,
                 "about": 0,
             },
         }
@@ -403,6 +429,9 @@ class BluetoothResetterApp:
             self.event_queue.put(("error", str(exc)))
 
     def _process_queue(self) -> None:
+        if self.is_shutting_down:
+            return
+
         while True:
             try:
                 event = self.event_queue.get_nowait()
@@ -418,7 +447,26 @@ class BluetoothResetterApp:
             elif event_type == "error":
                 self._finish_run(1, str(event[1]))
 
-        self.root.after(120, self._process_queue)
+        try:
+            self.root.after(120, self._process_queue)
+        except tk.TclError:
+            # Si la ventana ya fue destruida, no se vuelve a programar el loop.
+            return
+
+    def open_donation(self) -> None:
+        # Abre el enlace de PayPal de forma no bloqueante y registra el resultado.
+        try:
+            opened = webbrowser.open(DONATION_URL, new=2)
+        except Exception as exc:
+            self.append_log(f"{self.t('donate_open_error')} ({exc})", level="ERROR")
+            self.logger.exception("No se pudo abrir el enlace de donacion.")
+            messagebox.showerror(self.t("app_name"), self.t("donate_open_error"), parent=self.root)
+            return
+
+        if opened:
+            self.append_log(self.t("donate_opened"))
+        else:
+            self.append_log(self.t("donate_open_error"), level="WARNING")
 
     def _finish_run(self, return_code: int, error_message: str | None = None) -> None:
         self.run_in_progress = False
@@ -487,10 +535,20 @@ class BluetoothResetterApp:
         close_button.pack(anchor="e")
 
     def on_exit(self) -> None:
+        self.is_shutting_down = True
         self.cancel_auto_close(silent=True)
-        self._save_geometry()
+
+        # Guardado defensivo de geometria para evitar errores al salir durante eventos pendientes.
+        try:
+            self._save_geometry()
+        except tk.TclError:
+            pass
+
         self.logger.info("Aplicación cerrada por el usuario.")
-        self.root.destroy()
+        try:
+            self.root.destroy()
+        except tk.TclError:
+            pass
 
     def run(self) -> None:
         self.root.mainloop()

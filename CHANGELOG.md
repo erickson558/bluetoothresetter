@@ -1,5 +1,11 @@
 # Changelog
 
+## V0.0.4 - 2026-04-24
+- Se agrega boton de donaciones "Comprame una cerveza" en la interfaz y en el menu de ayuda, enlazado a PayPal.
+- Se amplía soporte multi idioma a Espanol, English y Portugues para todos los textos nuevos y existentes de interfaz.
+- Correccion de estabilidad en cierre de GUI: el loop de eventos ahora evita programar callbacks cuando la ventana se esta destruyendo.
+- Correccion defensiva al salir de la app para evitar errores `TclError` durante cierre con eventos pendientes.
+
 ## V0.0.3 - 2026-03-24
 - Corrección del workflow de GitHub Actions para leer la versión de la app sin errores de quoting en PowerShell.
 - La versión del release ahora se obtiene importando `bluetooth_resetter.version` en lugar de parsear el archivo con regex embebido en `pwsh`.
